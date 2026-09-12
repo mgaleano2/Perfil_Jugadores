@@ -1,5 +1,6 @@
 import glob
 import os
+from html import escape
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -8,97 +9,19 @@ import streamlit as st
 st.set_page_config(page_title="Player Profile - GPS", layout="wide")
 
 # ============================
-# WHITE AND BLUE, clean style
+# LOAD EXTERNAL CSS
 # ============================
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght=700;900&family=Barlow:wght=400;600&family=Space+Mono&display=swap');
-
-[data-testid="stAppViewContainer"] { background: #ffffff; }
-section[data-testid="stSidebar"] { background: #ffffff; border-right: 1px solid rgba(0,0,0,0.08); }
-
-.player-header {
-    background: #f7f9fc;
-    padding: 20px;
-    border-radius: 10px;
-    border-left: 6px solid #00a8cc;
-    margin-bottom: 25px;
-}
-.player-name {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 36px;
-    letter-spacing: 2px;
-    font-weight: 900;
-    margin: 0;
-}
-.player-meta {
-    color: #6b7280;
-    font-size: 14px;
-}
-.attribute-box {
-    background: #f7f9fc;
-    border: 1px solid rgba(0,0,0,0.06);
-    border-top: 2px solid #00a8cc;
-    border-radius: 8px;
-    padding: 12px 8px;
-    text-align: center;
-    margin-bottom: 10px;
-}
-.attribute-label {
-    font-family: 'Space Mono', monospace;
-    font-size: 9px;
-    letter-spacing: 1px;
-    color: #6b7280;
-}
-.attribute-value {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 26px;
-    font-weight: 700;
-}
-.section-title {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 20px;
-    letter-spacing: 2px;
-    border-bottom: 2px solid rgba(0,168,204,0.25);
-    margin-top: 35px;
-    margin-bottom: 15px;
-}
-.bio-box {
-    background: #f0f9ff;
-    border: 1px solid rgba(0,168,204,0.15);
-    border-radius: 8px;
-    padding: 12px;
-    text-align: center;
-}
-.bio-label {
-    font-family: 'Space Mono', monospace;
-    font-size: 8px;
-    color: #6b7280;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-.bio-value {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 22px;
-    font-weight: 700;
-    color: #111;
-}
-.bio-unit {
-    font-size: 11px;
-    color: #6b7280;
-}
-div[data-testid='stImage'] {
-    margin-top: -25px;
-}
-</style>
-""", unsafe_allow_html=True)
+css_path = os.path.join(os.path.dirname(__file__), "styles_gps.css")
+if os.path.exists(css_path):
+    with open(css_path) as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
 # ======================
 # CONFIG
 # ======================
-SESSIONS_DIR = "sessions"   # las planillas .xls van dentro de esta carpeta
-ROSTER_FILE = "roster.xlsx"  # Le agregue Apodo y numero
-PHOTO_DIR = "photo"         # Foto de cada uno
+SESSIONS_DIR = "sessions"
+ROSTER_FILE = "roster.xlsx"
+PHOTO_DIR = "photo"
 
 META_MAP = {
     '训练日期': 'Session Date', '训练结束时间': 'Session End Time', '训练ID': 'Session ID',
@@ -106,17 +29,9 @@ META_MAP = {
     '球员数量': 'Player Count', '场地': 'Field',
 }
 
-# Mapeo del nombre de equipo
 TEAM_NAME_MAP = {
     '厦门二中高中队': 'Xiamen',
 }
-
-def clean_field(raw_field):
-    """Extract just the field number, e.g. '1号场' -> '1'."""
-    if raw_field is None:
-        return raw_field
-    digits = ''.join(ch for ch in str(raw_field) if ch.isdigit())
-    return digits if digits else str(raw_field)
 
 COLUMN_MAP = {
     '姓名': 'Player', '球衣号': 'Jersey', '位置': 'Position',
@@ -127,8 +42,6 @@ COLUMN_MAP = {
     '跑动次数（高速跑）': 'HSR Count', '跑动次数（冲刺跑）': 'Sprint Count',
 }
 
-# What each metric means - shown in the in-app glossary
-# What each metric means - shown in the in-app glossary
 GLOSSARY = {
     "Time on Field": "Minutos que el chaleco realmente registró. Sirve para poner todo lo demás en contexto: no es lo mismo comparar 90 minutos de partido que 20 minutos de test.",
     "Max HR": "La frecuencia cardíaca más alta que tocó en la sesión. Mide el esfuerzo interno — cuánto le costó al cuerpo, más allá de cuánto corrió.",
@@ -142,10 +55,38 @@ GLOSSARY = {
     "Sprint Distance": "Metros corridos a máxima velocidad (sprint). Son las acciones explosivas que suelen definir jugadas.",
     "Sprint Count": "Cantidad de sprints que hizo. Resume en un solo número el ritmo de trabajo y la explosividad del jugador.",
 }
- 
 
-# Metrics considered simple/motivating enough to show players directly
-PLAYER_FACING_METRICS = ["Max Speed", "Total Distance", "Sprint Count", "Time on Field"]
+PLAYER_FACING_GLOSSARY = {
+    "Max Speed": GLOSSARY["Max Speed"],
+    "Total Distance": GLOSSARY["Total Distance"],
+    "Sprint Count": GLOSSARY["Sprint Count"],
+    "Time on Field": GLOSSARY["Time on Field"],
+}
+
+REQUIRED_COLUMNS = [
+    'Max Speed (km/h)', 'Total Distance (m)', 'Sprint Count', 'Player Load',
+    'Load Intensity', 'Sprint Distance (m)', 'HSR Distance (m)', 'HSR Count',
+    'Max HR (bpm)', 'Avg HR (bpm)', 'Time on Field (min)',
+]
+
+# ======================
+# UTILITY FUNCTIONS
+# ======================
+def clean_field(raw_field):
+    """Extract just the field number, e.g. '1号场' -> '1'."""
+    if raw_field is None:
+        return raw_field
+    digits = ''.join(ch for ch in str(raw_field) if ch.isdigit())
+    return digits if digits else str(raw_field)
+
+
+def ensure_columns(df, columns, fill_value=0):
+    """Ensure all required columns exist in the DataFrame, creating missing ones with fill_value."""
+    for col in columns:
+        if col not in df.columns:
+            df[col] = fill_value
+    return df
+
 
 # ======================
 # LOAD DATA FUNCTIONS
@@ -157,6 +98,7 @@ def load_roster():
     df = pd.read_excel(ROSTER_FILE)
     df.columns = df.columns.str.strip()
     return df
+
 
 @st.cache_data
 def load_sessions(_roster):
@@ -191,7 +133,6 @@ def load_sessions(_roster):
                 if c in df.columns:
                     df[c] = pd.to_numeric(df[c], errors='coerce').fillna(0)
 
-            # Link nickname + photo from the roster (keyed on the exact GPS export name)
             if not _roster.empty:
                 df = df.merge(
                     _roster[['Name', 'Nickname', 'Photo']],
@@ -203,12 +144,12 @@ def load_sessions(_roster):
                 df['Photo'] = None
             df['Display Name'] = df['Nickname'].fillna(df['Player'])
 
+            df = ensure_columns(df, REQUIRED_COLUMNS)
             date = meta.get('Session Date', os.path.basename(path))
             parsed.append((date, meta, df))
         except Exception as e:
             st.sidebar.warning(f"Could not read {os.path.basename(path)}: {e}")
 
-    # Date-only labels; add a "(n)" suffix only for dates that repeat, so nothing collides
     from collections import Counter
     date_counts = Counter(d for d, _, _ in parsed)
     seen = Counter()
@@ -221,8 +162,10 @@ def load_sessions(_roster):
         sessions[label] = (meta, df)
     return sessions
 
-roster = load_roster()
-sessions = load_sessions(roster)
+
+with st.spinner("Loading GPS sessions..."):
+    roster = load_roster()
+    sessions = load_sessions(roster)
 
 if not sessions:
     st.error(f"No GPS session files found in '{SESSIONS_DIR}/'. Drop your .xlsx exports there and reload.")
@@ -256,35 +199,43 @@ else:
     selected_players = [st.sidebar.selectbox("Select Player", name_options)]
 
 if st.sidebar.button("Export to PDF"):
-    st.sidebar.info("Press Ctrl + P (or Cmd + P) → Save as PDF")
+    st.components.v1.html("<script>window.parent.print();</script>", height=0, width=0)
 
 st.markdown("---")
-st.markdown("<style>@media print {.page-break { page-break-before: always; }}</style>", unsafe_allow_html=True)
 
-max_vals = {
-    'Max Speed (km/h)': max(df_main['Max Speed (km/h)'].max(), 1),
-    'Total Distance (m)': max(df_main['Total Distance (m)'].max(), 1),
-    'Sprint Count': max(df_main['Sprint Count'].max(), 1),
-    'Player Load': max(df_main['Player Load'].max(), 1),
-    'Load Intensity': max(df_main['Load Intensity'].max(), 1),
-}
+# ======================
+# COMPUTE MAX VALS (protected)
+# ======================
+max_vals = {}
+for col in ['Max Speed (km/h)', 'Total Distance (m)', 'Sprint Count', 'Player Load', 'Load Intensity']:
+    max_vals[col] = max(df_main[col].max(), 1) if col in df_main.columns else 1
 
 # ======================
 # RENDERING FUNCTIONS
 # ======================
 def get_row(display_name):
-    return df_main[df_main['Display Name'] == display_name].iloc[0]
+    rows = df_main[df_main['Display Name'] == display_name]
+    if rows.empty:
+        st.error(f"Player '{display_name}' not found in session data.")
+        st.stop()
+    return rows.iloc[0]
+
 
 def render_header(display_name):
     p = get_row(display_name)
     col_info, col_photo = st.columns([4, 1])
     with col_info:
+        player_name_esc = escape(str(p['Display Name']))
+        team_esc = escape(str(meta.get('Team', 'Club')))
+        session_esc = escape(str(session_label))
+        time_on_field = p.get('Time on Field (min)', 0)
+        jersey = p.get('Jersey', '-')
         st.markdown(f"""
         <div class="player-header">
-            <div class="player-name">{p['Display Name']}</div>
+            <div class="player-name">{player_name_esc}</div>
             <div class="player-meta">
-                #{p.get('Jersey', '-')} • {meta.get('Team', 'Club')} <br>
-                {session_label} • {p.get('Time on Field (min)', 0):.0f} min on field
+                #{jersey} • {team_esc} <br>
+                {session_esc} • {time_on_field:.0f} min on field
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -295,6 +246,7 @@ def render_header(display_name):
             if os.path.exists(photo_path):
                 st.image(photo_path, width=150)
 
+
 def render_gps_metrics(display_name):
     p = get_row(display_name)
     col_metrics, col_radar = st.columns([1, 1.2])
@@ -303,19 +255,19 @@ def render_gps_metrics(display_name):
         st.markdown('<div class="section-title">Physical Performance</div>', unsafe_allow_html=True)
 
         all_metrics = [
-            ("Max Speed", f"{p['Max Speed (km/h)']:.1f} km/h"),
-            ("Total Distance", f"{p['Total Distance (m)']:.0f} m"),
-            ("Sprints", f"{p['Sprint Count']:.0f} un"),
-            ("Time on Field", f"{p['Time on Field (min)']:.0f} min"),
+            ("Max Speed", f"{p.get('Max Speed (km/h)', 0):.1f} km/h"),
+            ("Total Distance", f"{p.get('Total Distance (m)', 0):.0f} m"),
+            ("Sprints", f"{p.get('Sprint Count', 0):.0f} un"),
+            ("Time on Field", f"{p.get('Time on Field (min)', 0):.0f} min"),
         ]
         coach_only_metrics = [
-            ("Sprint Distance", f"{p['Sprint Distance (m)']:.0f} m"),
-            ("HSR Distance", f"{p['HSR Distance (m)']:.0f} m"),
-            ("HSR Count", f"{p['HSR Count']:.0f} un"),
-            ("Player Load", f"{p['Player Load']:.1f} au"),
-            ("Load Intensity", f"{p['Load Intensity']:.2f} au/min"),
-            ("Max HR", f"{p['Max HR (bpm)']:.0f} bpm"),
-            ("Avg HR", f"{p['Avg HR (bpm)']:.0f} bpm"),
+            ("Sprint Distance", f"{p.get('Sprint Distance (m)', 0):.0f} m"),
+            ("HSR Distance", f"{p.get('HSR Distance (m)', 0):.0f} m"),
+            ("HSR Count", f"{p.get('HSR Count', 0):.0f} un"),
+            ("Player Load", f"{p.get('Player Load', 0):.1f} au"),
+            ("Load Intensity", f"{p.get('Load Intensity', 0):.2f} au/min"),
+            ("Max HR", f"{p.get('Max HR (bpm)', 0):.0f} bpm"),
+            ("Avg HR", f"{p.get('Avg HR (bpm)', 0):.0f} bpm"),
         ]
         metrics = all_metrics if view_mode.startswith("Player") else all_metrics + coach_only_metrics
 
@@ -335,23 +287,24 @@ def render_gps_metrics(display_name):
         if view_mode.startswith("Player"):
             categories = ['Speed', 'Distance', 'Sprints']
             radar_values = [
-                (p['Max Speed (km/h)'] / max_vals['Max Speed (km/h)']) * 100,
-                (p['Total Distance (m)'] / max_vals['Total Distance (m)']) * 100,
-                (p['Sprint Count'] / max_vals['Sprint Count']) * 100,
+                (p.get('Max Speed (km/h)', 0) / max_vals['Max Speed (km/h)']) * 100,
+                (p.get('Total Distance (m)', 0) / max_vals['Total Distance (m)']) * 100,
+                (p.get('Sprint Count', 0) / max_vals['Sprint Count']) * 100,
             ]
         else:
             categories = ['Speed', 'Distance', 'Sprints', 'Load', 'Intensity']
             radar_values = [
-                (p['Max Speed (km/h)'] / max_vals['Max Speed (km/h)']) * 100,
-                (p['Total Distance (m)'] / max_vals['Total Distance (m)']) * 100,
-                (p['Sprint Count'] / max_vals['Sprint Count']) * 100,
-                (p['Player Load'] / max_vals['Player Load']) * 100,
-                (p['Load Intensity'] / max_vals['Load Intensity']) * 100,
+                (p.get('Max Speed (km/h)', 0) / max_vals['Max Speed (km/h)']) * 100,
+                (p.get('Total Distance (m)', 0) / max_vals['Total Distance (m)']) * 100,
+                (p.get('Sprint Count', 0) / max_vals['Sprint Count']) * 100,
+                (p.get('Player Load', 0) / max_vals['Player Load']) * 100,
+                (p.get('Load Intensity', 0) / max_vals['Load Intensity']) * 100,
             ]
         fig = go.Figure()
         fig.add_trace(go.Scatterpolar(r=radar_values, theta=categories, fill='toself', name=display_name, line=dict(color='#00a8cc')))
         fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100], ticksuffix="%")), showlegend=False, margin=dict(t=40, b=40, l=40, r=40), height=320, paper_bgcolor='rgba(0,0,0,0)')
         st.plotly_chart(fig, use_container_width=True, key=f"radar_{display_name}")
+
 
 # ======================
 # TAB LOGIC
@@ -359,7 +312,7 @@ def render_gps_metrics(display_name):
 if not report_mode:
     render_header(selected_players[0])
 
-tab1, tab2, tab3 = st.tabs(["🏃‍♂️ GPS & Load", "⚡ Sprint Power", "🥇 Squad Leaderboard"])
+tab1, tab2, tab3 = st.tabs(["GPS & Load", "Sprint Power", "Squad Leaderboard"])
 
 with tab1:
     for i, player in enumerate(selected_players):
@@ -371,10 +324,10 @@ with tab1:
         if report_mode:
             st.markdown("<hr style='border: 1px solid #38bdf8; margin: 40px 0;'>", unsafe_allow_html=True)
 
-    if view_mode.startswith("Coach"):
-        with st.expander("📖 Glossary — what each metric means"):
-            for label, explanation in GLOSSARY.items():
-                st.markdown(f"**{label}** — {explanation}")
+    with st.expander("Glossary — what each metric means"):
+        glossary_items = GLOSSARY if view_mode.startswith("Coach") else PLAYER_FACING_GLOSSARY
+        for label, explanation in glossary_items.items():
+            st.markdown(f"**{label}** — {explanation}")
 
 with tab2:
     for i, player in enumerate(selected_players):
@@ -411,10 +364,11 @@ with tab3:
             'Sprint Distance (m)', 'Sprint Count', 'HSR Distance (m)', 'HSR Count',
             'Player Load', 'Load Intensity', 'Max HR (bpm)', 'Avg HR (bpm)',
         ]
-    df_ranking = df_main[cols_ranking].rename(columns={'Display Name': 'Player'})
+    cols_available = [c for c in cols_ranking if c in df_main.columns]
+    df_ranking = df_main[cols_available].rename(columns={'Display Name': 'Player'})
 
     st.dataframe(
-        df_ranking.sort_values(by='Max Speed (km/h)', ascending=False),
+        df_ranking.sort_values(by='Max Speed (km/h)' if 'Max Speed (km/h)' in df_ranking.columns else df_ranking.columns[0], ascending=False),
         use_container_width=True,
         hide_index=True,
         height=750,
