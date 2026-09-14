@@ -11,88 +11,10 @@ st.set_page_config(page_title="Player Profile - GPS", layout="wide")
 # ============================
 # WHITE AND BLUE, clean style
 # ============================
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght=700;900&family=Barlow:wght=400;600&family=Space+Mono&display=swap');
-
-[data-testid="stAppViewContainer"] { background: #ffffff; }
-section[data-testid="stSidebar"] { background: #ffffff; border-right: 1px solid rgba(0,0,0,0.08); }
-
-.player-header {
-    background: #f7f9fc;
-    padding: 20px;
-    border-radius: 10px;
-    border-left: 6px solid #00a8cc;
-    margin-bottom: 25px;
-}
-.player-name {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 36px;
-    letter-spacing: 2px;
-    font-weight: 900;
-    margin: 0;
-}
-.player-meta {
-    color: #6b7280;
-    font-size: 14px;
-}
-.attribute-box {
-    background: #f7f9fc;
-    border: 1px solid rgba(0,0,0,0.06);
-    border-top: 2px solid #00a8cc;
-    border-radius: 8px;
-    padding: 12px 8px;
-    text-align: center;
-    margin-bottom: 10px;
-}
-.attribute-label {
-    font-family: 'Space Mono', monospace;
-    font-size: 9px;
-    letter-spacing: 1px;
-    color: #6b7280;
-}
-.attribute-value {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 26px;
-    font-weight: 700;
-}
-.section-title {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 20px;
-    letter-spacing: 2px;
-    border-bottom: 2px solid rgba(0,168,204,0.25);
-    margin-top: 35px;
-    margin-bottom: 15px;
-}
-.bio-box {
-    background: #f0f9ff;
-    border: 1px solid rgba(0,168,204,0.15);
-    border-radius: 8px;
-    padding: 12px;
-    text-align: center;
-}
-.bio-label {
-    font-family: 'Space Mono', monospace;
-    font-size: 8px;
-    color: #6b7280;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-.bio-value {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 22px;
-    font-weight: 700;
-    color: #111;
-}
-.bio-unit {
-    font-size: 11px;
-    color: #6b7280;
-}
-div[data-testid='stImage'] {
-    margin-top: -25px;
-}
-</style>
-""", unsafe_allow_html=True)
+css_path = os.path.join(os.path.dirname(__file__), "styles_gps.css")
+if os.path.exists(css_path):
+    with open(css_path) as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
 # ======================
 # CONFIG
@@ -100,7 +22,7 @@ div[data-testid='stImage'] {
 SESSIONS_DIR = "sessions"   # las planillas .xls van dentro de esta carpeta
 ROSTER_FILE = "roster.xlsx"  # Le agregue Apodo y numero
 PHOTO_DIR = "photo"         # Foto de cada uno
-LOGO_FILE = "logo.png1"      # Logo del equipo (raiz del proyecto)
+LOGO_FILE = "logo.png"      # Logo del equipo (raiz del proyecto)
 
 def load_logo_b64():
     if not os.path.exists(LOGO_FILE):
@@ -138,7 +60,6 @@ COLUMN_MAP = {
 }
 
 # What each metric means - shown in the in-app glossary
-# What each metric means - shown in the in-app glossary
 GLOSSARY = {
     "Time on Field": "Minutos que el chaleco realmente registró. Sirve para poner todo lo demás en contexto: no es lo mismo comparar 90 minutos de partido que 20 minutos de test.",
     "Max HR": "La frecuencia cardíaca más alta que tocó en la sesión. Mide el esfuerzo interno — cuánto le costó al cuerpo, más allá de cuánto corrió.",
@@ -152,10 +73,6 @@ GLOSSARY = {
     "Sprint Distance": "Metros corridos a máxima velocidad (sprint). Son las acciones explosivas que suelen definir jugadas.",
     "Sprint Count": "Cantidad de sprints que hizo. Resume en un solo número el ritmo de trabajo y la explosividad del jugador.",
 }
- 
-
-# Metrics considered simple/motivating enough to show players directly
-PLAYER_FACING_METRICS = ["Max Speed", "Total Distance", "Sprint Count", "Time on Field"]
 
 # ======================
 # LOAD DATA FUNCTIONS
