@@ -1,5 +1,6 @@
 import base64
 import glob
+import html
 import os
 
 import pandas as pd
@@ -90,6 +91,152 @@ section[data-testid="stSidebar"] { background: #ffffff; border-right: 1px solid 
 }
 div[data-testid='stImage'] {
     margin-top: -25px;
+}
+.records-header {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 26px;
+    letter-spacing: 2px;
+    font-weight: 900;
+    color: #0e3a5d;
+    margin: 0;
+}
+.records-sub {
+    color: #6b7280;
+    font-size: 14px;
+    margin: 2px 0 6px;
+}
+.records-meta {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    color: #00a8cc;
+    margin-bottom: 16px;
+}
+.pk-kpis {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin: 0 0 18px;
+}
+@media (max-width: 900px) { .pk-kpis { grid-template-columns: 1fr; } }
+.pk-kpi {
+    background: #f7f9fc;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-top: 3px solid #00a8cc;
+    border-radius: 10px;
+    padding: 12px 14px;
+}
+.pk-kpi-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #6b7280;
+}
+.pk-kpi-value {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 30px;
+    font-weight: 700;
+    color: #0e3a5d;
+    line-height: 1.15;
+}
+.pk-kpi-sub {
+    font-size: 11px;
+    color: #6b7280;
+}
+.pk-kpi .pk-unit {
+    font-size: 13px;
+    color: #6b7280;
+}
+.pk-legend {
+    display: flex;
+    gap: 16px;
+    margin: 6px 0 10px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    color: #6b7280;
+}
+.pk-dot {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    margin-right: 5px;
+    vertical-align: middle;
+}
+.pk-green { background: #22c55e; }
+.pk-amber { background: #f59e0b; }
+.pk-grey { background: #cbd5e1; }
+.pk-bars {
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 12px;
+    padding: 10px 18px 14px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
+}
+.pk-row {
+    display: grid;
+    grid-template-columns: 34px 220px minmax(120px, 1fr) 130px;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px dashed rgba(0, 0, 0, 0.05);
+}
+.pk-row:last-child { border-bottom: none; }
+.pk-rank {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: #9ca3af;
+}
+.pk-rank-lead { color: #00a8cc; font-weight: 700; }
+.pk-name {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    font-size: 14px;
+}
+.pk-name .pk-dot { margin-right: 8px; flex-shrink: 0; }
+.pk-who { font-weight: 600; }
+.pk-who-lead { color: #0e3a5d; }
+.pk-jersey { color: #00a8cc; font-weight: 700; font-size: 12px; margin-left: 6px; }
+.pk-track { position: relative; }
+.pk-bar {
+    position: relative;
+    height: 8px;
+    border-radius: 6px;
+    background: #eef2f7;
+}
+.pk-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    border-radius: 6px;
+    background: #cbd5e1;
+}
+.pk-fill-lead { background: linear-gradient(90deg, #00a8cc, #38bdf8); }
+.pk-avg {
+    position: absolute;
+    top: -4px;
+    bottom: -4px;
+    width: 0;
+    border-left: 1px dashed rgba(0, 168, 204, 0.6);
+}
+.pk-val {
+    font-family: 'Barlow Condensed', sans-serif;
+    text-align: right;
+    white-space: nowrap;
+}
+.pk-num { font-size: 20px; font-weight: 700; color: #0e3a5d; }
+.pk-unit { font-size: 11px; color: #6b7280; margin-left: 4px; }
+.pk-pct {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: #9ca3af;
+    margin-left: 8px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -284,42 +431,22 @@ def build_all_sessions(sessions):
 
 all_df = build_all_sessions(sessions)
 
-def build_leaderboard(all_df, min_sessions):
-    """One row per player with the average of ALL their sessions plus an overall Score (0-100).
-    Score = mean percentile of: best max speed, sprints per session, metres per minute."""
+def build_records(all_df):
+    """One row per player with their BEST single-session mark per metric (records-style,
+    not averages). Every qualifying session in the folder counts."""
     lb = all_df.groupby('Display Name').agg(
         Jersey=('Jersey', 'last'),
-        Sessions=('Session', 'nunique'),
         BestSpeed=('Max Speed (km/h)', 'max'),
-        AvgDistance=('Total Distance (m)', 'mean'),
-        AvgSprints=('Sprint Count', 'mean'),
-        AvgSprintDist=('Sprint Distance (m)', 'mean'),
-        AvgHSRDist=('HSR Distance (m)', 'mean'),
-        AvgHSRCount=('HSR Count', 'mean'),
-        AvgLoad=('Player Load', 'mean'),
-        AvgIntensity=('Load Intensity', 'mean'),
-        AvgMaxHR=('Max HR (bpm)', 'mean'),
-        AvgHR=('Avg HR (bpm)', 'mean'),
-        _dist=('Total Distance (m)', 'sum'),
-        _min=('Time on Field (min)', 'sum'),
+        BestDist=('Total Distance (m)', 'max'),
+        BestSprints=('Sprint Count', 'max'),
+        BestSprintDist=('Sprint Distance (m)', 'max'),
+        BestHSRDist=('HSR Distance (m)', 'max'),
+        BestHSRCount=('HSR Count', 'max'),
+        BestLoad=('Player Load', 'max'),
+        BestIntensity=('Load Intensity', 'max'),
+        BestMaxHR=('Max HR (bpm)', 'max'),
     ).reset_index()
-    lb['m/min'] = lb['_dist'] / lb['_min'].where(lb['_min'] > 0)
-
-    eligible = lb['Sessions'] >= min_sessions
-    parts = pd.DataFrame({
-        'speed': lb.loc[eligible, 'BestSpeed'].rank(pct=True),
-        'sprints': lb.loc[eligible, 'AvgSprints'].rank(pct=True),
-        'pace': lb.loc[eligible, 'm/min'].rank(pct=True),
-    })
-    lb['Score'] = parts.mean(axis=1) * 100   # NaN for players below the minimum number of sessions
-    lb = lb.sort_values('Score', ascending=False, na_position='last').reset_index(drop=True)
-
-    medals = {1: '🥇', 2: '🥈', 3: '🥉'}
-    lb['Rank'] = [
-        medals.get(i, f"#{i}") if (i <= TOP_N and pd.notna(s)) else ""
-        for i, s in enumerate(lb['Score'], start=1)
-    ]
-    return lb
+    return lb.sort_values('BestSpeed', ascending=False, na_position='last').reset_index(drop=True)
 
 # ======================
 # SIDEBAR
@@ -500,7 +627,7 @@ if not report_mode:
     render_header(selected_players[0])
 
 tab1, tab2, tab3, tab4 = st.tabs([
-    "🏃‍♂️ GPS & Load", "⚡ Sprint Power", "🥇 Squad Leaderboard", "🏆 Squad — All Sessions",
+    "🏃‍♂️ GPS & Load", "⚡ Sprint Power", "🥇 Squad Leaderboard", "🏆 Squad Records",
 ])
 
 with tab1:
@@ -577,66 +704,165 @@ with tab3:
     )
 
 with tab4:
-    st.markdown('<div class="section-title">Squad Ranking — All Sessions</div>', unsafe_allow_html=True)
-
     if all_df.empty:
-        st.info(f"No hay sesiones de {MIN_MINUTES}+ min para armar el ranking.")
+        st.info(f"No hay sesiones de {MIN_MINUTES}+ min para armar el tablero de récords.")
     else:
-        n_total = int(all_df['Session'].nunique())
-        default_min = min(3, n_total)
-        coach_view = view_mode.startswith("Coach")
-        if coach_view:
-            min_sessions = st.number_input(
-                "Min. sessions to be ranked", min_value=1, max_value=n_total, value=default_min, step=1,
-            )
-        else:
-            min_sessions = default_min
+        lb = build_records(all_df)
 
-        lb = build_leaderboard(all_df, min_sessions)
+        n_players = len(lb)
+        n_sessions = int(all_df['Session'].nunique())
 
-        if coach_view:
-            cols_lb = ['Rank', 'Jersey', 'Display Name', 'Sessions', 'Score', 'BestSpeed', 'AvgDistance',
-                       'm/min', 'AvgSprints', 'AvgSprintDist', 'AvgHSRDist', 'AvgHSRCount',
-                       'AvgLoad', 'AvgIntensity', 'AvgMaxHR', 'AvgHR']
-            lb_show = lb
-        else:
-            # Players only see the ones who stand out (top 10), not the whole table
-            cols_lb = ['Rank', 'Jersey', 'Display Name', 'Sessions', 'Score', 'BestSpeed', 'AvgDistance', 'AvgSprints']
-            lb_show = lb[lb['Rank'] != '']
+        st.markdown(
+            '<div class="records-header">Squad Records</div>'
+            '<div class="records-sub">La mejor marca de cada jugador en una sola sesión (sin promedios). '
+            'Distribución del plantel por categoría.</div>'
+            f'<div class="records-meta">{n_players} jugadores · {n_sessions} sesiones</div>',
+            unsafe_allow_html=True,
+        )
 
-        labels = {
-            'Display Name': 'Player', 'BestSpeed': 'Best Max Speed', 'AvgDistance': 'Avg Distance',
-            'AvgSprints': 'Avg Sprints', 'AvgSprintDist': 'Avg Sprint Dist', 'AvgHSRDist': 'Avg HSR Dist',
-            'AvgHSRCount': 'Avg HSR Count', 'AvgLoad': 'Avg Player Load', 'AvgIntensity': 'Avg Load Intensity',
-            'AvgMaxHR': 'Avg Max HR', 'AvgHR': 'Avg HR',
+        metric_groups = {
+            'Volumen': [
+                ('Best Total Distance', 'BestDist', 'm', "{:.0f}"),
+                ('Best Sprint Count', 'BestSprints', 'sprints', "{:.0f}"),
+                ('Best Sprint Distance', 'BestSprintDist', 'm', "{:.0f}"),
+                ('Best HSR Distance', 'BestHSRDist', 'm', "{:.0f}"),
+                ('Best HSR Count', 'BestHSRCount', 'veces', "{:.0f}"),
+                ('Best Player Load', 'BestLoad', 'au', "{:.0f}"),
+            ],
+            'Intensidad': [
+                ('Best Max Speed', 'BestSpeed', 'km/h', "{:.1f}"),
+                ('Best Load Intensity', 'BestIntensity', 'au/min', "{:.2f}"),
+                ('Best Max HR', 'BestMaxHR', 'bpm', "{:.0f}"),
+            ],
         }
 
+        c_sel = st.columns([1, 3])
+        with c_sel[0]:
+            group = st.segmented_control("Grupo", list(metric_groups), default="Intensidad", key="pk_group")
+        with c_sel[1]:
+            metric_opts = {lab: (key, unit, spec) for lab, key, unit, spec in metric_groups[group]}
+            metric = st.selectbox("Métrica", list(metric_opts), key="pk_metric")
+        metric_key, unit, spec = metric_opts[metric]
+
+        vals = lb[['Display Name', 'Jersey', metric_key]].dropna(subset=[metric_key]).copy()
+        vals = vals[vals[metric_key] > 0].sort_values(metric_key, ascending=False).reset_index(drop=True)
+
+        if vals.empty:
+            st.info(f"Sin datos válidos para {metric}.")
+        else:
+            best_val = vals[metric_key].iloc[0]
+            avg_val = vals[metric_key].mean()
+            p75_thr = vals[metric_key].quantile(0.75)
+            n_p75 = int((vals[metric_key] >= p75_thr).sum())
+            vals['pct'] = (vals[metric_key].rank(pct=True) * 100).round().astype(int)
+            n_rows = len(vals)
+
+            leader_row = vals.iloc[0]
+            leader_name = html.escape(str(leader_row['Display Name']))
+            leader_jersey = f' #{int(leader_row["Jersey"])}' if pd.notna(leader_row['Jersey']) else ''
+
+            st.markdown(
+                f'<div class="pk-kpis">'
+                f'<div class="pk-kpi"><div class="pk-kpi-label">Promedio plantel</div>'
+                f'<div class="pk-kpi-value">{spec.format(avg_val)}<span class="pk-unit"> {unit}</span></div>'
+                f'<div class="pk-kpi-sub">{n_rows} jugadores computados</div></div>'
+                f'<div class="pk-kpi"><div class="pk-kpi-label">Team best</div>'
+                f'<div class="pk-kpi-value">{spec.format(best_val)}<span class="pk-unit"> {unit}</span></div>'
+                f'<div class="pk-kpi-sub">{leader_name}{leader_jersey}</div></div>'
+                f'<div class="pk-kpi"><div class="pk-kpi-label">Superan P75</div>'
+                f'<div class="pk-kpi-value">{n_p75}<span class="pk-unit"> jug.</span></div>'
+                f'<div class="pk-kpi-sub">≥ {spec.format(p75_thr)} {unit}</div></div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+            st.markdown(
+                '<div class="pk-legend">'
+                '<span><span class="pk-dot pk-green"></span>P75+' + '</span>'
+                '<span><span class="pk-dot pk-amber"></span>P50–P75</span>'
+                '<span><span class="pk-dot pk-grey"></span>&lt;P50</span>'
+                f'<span style="margin-left:auto">⋮ promedio plantel</span>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+
+            avg_pct = avg_val / best_val * 100 if best_val > 0 else 0
+            rows_html = []
+            for i, (_, r) in enumerate(vals.iterrows(), start=1):
+                val_pct = r[metric_key] / best_val * 100
+                pct = int(r['pct'])
+                flag = 'pk-green' if pct >= 75 else ('pk-amber' if pct >= 50 else 'pk-grey')
+                name = html.escape(str(r['Display Name']))
+                jersey = f'<span class="pk-jersey">#{int(r["Jersey"])}</span>' if pd.notna(r['Jersey']) else ''
+                leader = i == 1
+                rows_html.append(
+                    f'<div class="pk-row">'
+                    f'<div class="pk-rank{" pk-rank-lead" if leader else ""}">{i:02d}</div>'
+                    f'<div class="pk-name">'
+                    f'<span class="pk-dot {flag}"></span>'
+                    f'<span class="pk-who{" pk-who-lead" if leader else ""}">{name}{" " + jersey if jersey else ""}</span>'
+                    f'</div>'
+                    f'<div class="pk-track">'
+                    f'<div class="pk-bar"><div class="pk-fill{" pk-fill-lead" if leader else ""}" style="width:{val_pct:.1f}%"></div></div>'
+                    f'<div class="pk-avg" style="left:{avg_pct:.1f}%"></div>'
+                    f'</div>'
+                    f'<div class="pk-val"><span class="pk-num">{spec.format(r[metric_key])}</span>'
+                    f'<span class="pk-unit"> {unit}</span><span class="pk-pct">P{pct}</span></div>'
+                    f'</div>'
+                )
+            st.markdown(f'<div class="pk-bars">{"".join(rows_html)}</div>', unsafe_allow_html=True)
+
+            st.caption(
+                f"{metric}: el promedio del plantel es {spec.format(avg_val)} {unit}. "
+                f"{leader_name} lidera con {spec.format(best_val)} {unit} (P100). "
+                f"{n_p75} de {n_rows} jugadores superan el P75 ({spec.format(p75_thr)} {unit})."
+            )
+
+        st.markdown("---")
+
+        labels = {
+            'Jersey': 'Jersey', 'Display Name': 'Player', 'BestSpeed': 'Best Max Speed',
+            'BestDist': 'Best Total Distance', 'BestSprints': 'Best Sprint Count',
+            'BestSprintDist': 'Best Sprint Distance', 'BestHSRDist': 'Best HSR Distance',
+            'BestHSRCount': 'Best HSR Count', 'BestLoad': 'Best Player Load',
+            'BestIntensity': 'Best Load Intensity', 'BestMaxHR': 'Best Max HR',
+        }
+        cols_lb = [
+            'Jersey', 'Display Name', 'BestSpeed', 'BestDist', 'BestSprints',
+            'BestSprintDist', 'BestHSRDist', 'BestHSRCount', 'BestLoad',
+            'BestIntensity', 'BestMaxHR',
+        ]
+
+        styled = lb[cols_lb].rename(columns=labels).style.highlight_max(
+            axis=0,
+            subset=[
+                'Best Max Speed', 'Best Total Distance', 'Best Sprint Count',
+                'Best Sprint Distance', 'Best HSR Distance', 'Best HSR Count',
+                'Best Player Load', 'Best Load Intensity', 'Best Max HR',
+            ],
+            color='#e0f2fe',
+        )
+
         st.dataframe(
-            lb_show[cols_lb].rename(columns=labels),
+            styled,
             use_container_width=True,
             hide_index=True,
-            height=750 if coach_view else 420,
+            height=560,
             column_config={
                 "Jersey": st.column_config.NumberColumn("Jersey"),
-                "Sessions": st.column_config.NumberColumn("Sessions", format="%d"),
-                "Score": st.column_config.ProgressColumn("Score", format="%.0f", min_value=0, max_value=100),
                 "Best Max Speed": st.column_config.ProgressColumn("Best Max Speed", format="%.1f km/h", min_value=0, max_value=40),
-                "Avg Distance": st.column_config.NumberColumn("Avg Distance", format="%.0f m"),
-                "m/min": st.column_config.NumberColumn("m/min", format="%.0f"),
-                "Avg Sprints": st.column_config.NumberColumn("Avg Sprints", format="%.1f"),
-                "Avg Sprint Dist": st.column_config.NumberColumn("Avg Sprint Dist", format="%.0f m"),
-                "Avg HSR Dist": st.column_config.NumberColumn("Avg HSR Dist", format="%.0f m"),
-                "Avg HSR Count": st.column_config.NumberColumn("Avg HSR Count", format="%.1f"),
-                "Avg Player Load": st.column_config.NumberColumn("Avg Player Load", format="%.1f"),
-                "Avg Load Intensity": st.column_config.NumberColumn("Avg Load Intensity", format="%.2f"),
-                "Avg Max HR": st.column_config.NumberColumn("Avg Max HR", format="%d bpm"),
-                "Avg HR": st.column_config.NumberColumn("Avg HR", format="%d bpm"),
+                "Best Total Distance": st.column_config.NumberColumn("Best Total Distance", format="%.0f m"),
+                "Best Sprint Count": st.column_config.NumberColumn("Best Sprint Count", format="%d"),
+                "Best Sprint Distance": st.column_config.NumberColumn("Best Sprint Distance", format="%.0f m"),
+                "Best HSR Distance": st.column_config.NumberColumn("Best HSR Distance", format="%.0f m"),
+                "Best HSR Count": st.column_config.NumberColumn("Best HSR Count", format="%d"),
+                "Best Player Load": st.column_config.NumberColumn("Best Player Load", format="%.1f"),
+                "Best Load Intensity": st.column_config.NumberColumn("Best Load Intensity", format="%.2f"),
+                "Best Max HR": st.column_config.NumberColumn("Best Max HR", format="%d bpm"),
             },
         )
 
         st.caption(
-            f"Score (0-100) = promedio de la posición del jugador en 3 cosas: velocidad máxima (su mejor sesión), "
-            f"sprints por sesión y metros por minuto. Solo cuentan sesiones de {MIN_MINUTES}+ minutos, "
-            f"y solo se rankean jugadores con al menos {min_sessions} sesión(es). "
-            f"Top {TOP_N} marcado con 🥇🥈🥉 y #4 a #{TOP_N}."
+            f"Cada columna = mejor marca del jugador en UNA sola sesión (no promedios). "
+            f"Solo cuentan sesiones de {MIN_MINUTES}+ minutos. Celeste = récord del equipo."
         )
