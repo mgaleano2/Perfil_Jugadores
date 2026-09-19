@@ -326,13 +326,9 @@ L = {
     "metric": ("Metric", "指标"),
     "volume": ("Volume", "体量"),
     "intensity_k": ("Intensity", "强度"),
-    "records_sub": ("Best single-session mark per player (no averages). Squad distribution by category.",
-                    "每个球员的单场最佳成绩（非平均值）。全队按类别分布。"),
-    "records_meta": ("{} players · {} sessions", "{} 名球员 · {} 场训练课"),
     "squad_avg": ("Squad Average", "球队平均"),
     "team_best": ("Team Best", "队内最佳"),
     "above_p75": ("Above P75", "超过P75"),
-    "counted": ("players counted", "名球员计入"),
     "p75plus": ("P75+", "顶级"),
     "p50_75": ("P50–P75", "中上"),
     "lt_p50": ("<P50", "待提升"),
@@ -347,11 +343,6 @@ L = {
     "best_max_speed": ("Best Max Speed", "最佳最高速度"),
     "best_intensity": ("Best Load Intensity", "最佳负荷强度"),
     "best_maxhr": ("Best Max HR", "最佳最大心率"),
-    "narr_line": (
-        "{metric}: squad average {avg} {unit}. {leader} leads with {best} {unit} (P100). "
-        "{n} of {n_rows} players above P75 ({thr} {unit}).",
-        "{metric}：球队平均 {avg} {unit}。{leader} 以 {best} {unit}（P100）领先。{n}/{n_rows} 名球员超过P75（{thr} {unit}）。",
-    ),
     "table_note": (
         "Each column = player's best in ONE session (no averages). Only {n}+ min sessions count. "
         "Light blue = squad record.",
@@ -367,6 +358,9 @@ def MI(key):
 def MIH(key):
     en, zh = L[key]
     return f"{en} <span class='cn'>· {zh}</span>"
+
+def MIE(key):
+    return L[key][0]
 
 def MIZH(key):
     return L[key][1]
@@ -509,7 +503,7 @@ def load_sessions(_roster, signature):
             date = meta.get('Session Date', os.path.basename(path))
             parsed.append((date, meta, df))
         except Exception as e:
-            st.sidebar.warning(f"{MI('could_not_read')} {os.path.basename(path)}: {e}")
+            st.sidebar.warning(f"{MIE('could_not_read')} {os.path.basename(path)}: {e}")
 
     # Date-only labels; add a "(n)" suffix only for dates that repeat, so nothing collides
     from collections import Counter
@@ -531,7 +525,7 @@ if not sessions:
     st.error(f"{MI('no_sessions')} in '{SESSIONS_DIR}/'. Drop your .xlsx exports there and reload. 将 .xlsx 文件放入该目录后重新加载。")
     st.stop()
 if roster.empty:
-    st.sidebar.warning(f"{MI('no_roster')} — add it to link nicknames and photos. 添加名单以关联昵称和照片。")
+    st.sidebar.warning(f"{MIE('no_roster')} — add it to link nicknames and photos.")
 
 # ======================
 # ALL-SESSIONS DATA (for averages and the all-sessions ranking)
@@ -576,30 +570,30 @@ if os.path.exists(LOGO_FILE):
     st.sidebar.image(LOGO_FILE, width=140)
     st.sidebar.markdown("---")
 
-st.sidebar.markdown(f"### {MI('session')}")
-session_label = st.sidebar.selectbox(MI('select_training'), list(sessions.keys()))
+st.sidebar.markdown(f"### {MIE('session')}")
+session_label = st.sidebar.selectbox(MIE('select_training'), list(sessions.keys()))
 meta, df_main = sessions[session_label]
 
 st.sidebar.markdown(
-    f"**{MI('team')}:** {meta.get('Team', '-')}  \n"
-    f"**{MI('field')}:** {meta.get('Field', '-')}  \n"
-    f"**{MI('players')}:** {meta.get('Player Count', len(df_main))}"
+    f"**{MIE('team')}:** {meta.get('Team', '-')}  \n"
+    f"**{MIE('field')}:** {meta.get('Field', '-')}  \n"
+    f"**{MIE('players')}:** {meta.get('Player Count', len(df_main))}"
 )
 
-st.sidebar.markdown(f"### {MI('view')}")
-view_mode = st.sidebar.radio(MI('audience'), [MI('coach'), MI('player_friendly')])
+st.sidebar.markdown(f"### {MIE('view')}")
+view_mode = st.sidebar.radio(MIE('audience'), [MIE('coach'), MIE('player_friendly')])
 
-st.sidebar.markdown(f"### {MI('player_selection')}")
-report_mode = st.sidebar.checkbox(MI('all_players'))
+st.sidebar.markdown(f"### {MIE('player_selection')}")
+report_mode = st.sidebar.checkbox(MIE('all_players'))
 
 name_options = df_main.sort_values('Display Name')['Display Name'].unique()
 if report_mode:
     selected_players = name_options.tolist()
 else:
-    selected_players = [st.sidebar.selectbox(MI('select_player'), name_options)]
+    selected_players = [st.sidebar.selectbox(MIE('select_player'), name_options)]
 
-if st.sidebar.button(MI('export_pdf')):
-    st.sidebar.info(MI('pdf_hint'))
+if st.sidebar.button(MIE('export_pdf')):
+    st.sidebar.info(MIE('pdf_hint'))
 
 st.markdown("---")
 st.markdown("<style>@media print {.page-break { page-break-before: always; }}</style>", unsafe_allow_html=True)
@@ -666,7 +660,7 @@ def render_gps_metrics(display_name):
             ("Max HR", f"{p['Max HR (bpm)']:.0f} bpm"),
             ("Avg HR", f"{p['Avg HR (bpm)']:.0f} bpm"),
         ]
-        metrics = all_metrics if view_mode == MI('player_friendly') else all_metrics + coach_only_metrics
+        metrics = all_metrics if view_mode == MIE('player_friendly') else all_metrics + coach_only_metrics
 
         c1, c2 = st.columns(2)
         for i, (label, value) in enumerate(metrics):
@@ -681,7 +675,7 @@ def render_gps_metrics(display_name):
             """, unsafe_allow_html=True)
 
     with col_radar:
-        if view_mode == MI('player_friendly'):
+        if view_mode == MIE('player_friendly'):
             categories = ['Speed', 'Distance', 'Sprints']
             radar_values = [
                 (p['Max Speed (km/h)'] / max_vals['Max Speed (km/h)']) * 100,
@@ -730,7 +724,7 @@ def render_avg_metrics(display_name):
         ("Max HR", fmt(avg['Max HR (bpm)']), "bpm"),
         ("Avg HR", fmt(avg['Avg HR (bpm)']), "bpm"),
     ]
-    metrics = all_metrics if view_mode == MI('player_friendly') else all_metrics + coach_only_metrics
+    metrics = all_metrics if view_mode == MIE('player_friendly') else all_metrics + coach_only_metrics
 
     cols = st.columns(4)
     for i, (label, val_part, unit_part) in enumerate(metrics):
@@ -763,7 +757,7 @@ with tab1:
         if report_mode:
             st.markdown("<hr style='border: 1px solid #38bdf8; margin: 40px 0;'>", unsafe_allow_html=True)
 
-    if view_mode == MI('coach'):
+    if view_mode == MIE('coach'):
         with st.expander(f"📖 {MIH('glossary')}"):
             for label, (en, zh) in GLOSSARY.items():
                 st.markdown(f"**{MIH(label)}** — {en}  \n{zh}")
@@ -784,7 +778,7 @@ with tab2:
         c2.metric(MI('Sprint Distance'), f"{dist_sprint:.0f} m")
         c3.metric(MI('avg_per_sprint'), f"{eficiencia:.1f} m/sprint")
 
-        if view_mode == MI('coach'):
+        if view_mode == MIE('coach'):
             st.markdown(f'<div class="section-title">{MIH("hsr")}</div>', unsafe_allow_html=True)
             h1, h2 = st.columns(2)
             h1.metric(MI('HSR Distance'), f"{p.get('HSR Distance (m)', 0):.0f} m")
@@ -795,7 +789,7 @@ with tab2:
 with tab3:
     st.markdown(f'<div class="section-title">{MIH("squad_ranking")}</div>', unsafe_allow_html=True)
 
-    if view_mode == MI('player_friendly'):
+    if view_mode == MIE('player_friendly'):
         cols_ranking = ['Jersey', 'Display Name', 'Max Speed (km/h)', 'Total Distance (m)', 'Sprint Count']
     else:
         cols_ranking = [
@@ -837,9 +831,7 @@ with tab4:
 
         st.markdown(
             f'<div class="records-header">{MIH("tab_records")}</div>'
-            f'<div class="records-sub">{MIH("records_sub")}</div>'
-            f'<div class="records-meta">{L["records_meta"][0].format(n_players, n_sessions)} · '
-            f'<span class="cn">{L["records_meta"][1].format(n_players, n_sessions)}</span></div>',
+            f'<div class="records-meta">{n_players} players · {n_sessions} sessions</div>',
             unsafe_allow_html=True,
         )
 
@@ -901,10 +893,10 @@ with tab4:
 
             st.markdown(
                 '<div class="pk-legend">'
-                f'<span><span class="pk-dot pk-green"></span>{MI("p75plus")}</span>'
-                f'<span><span class="pk-dot pk-amber"></span>{MI("p50_75")}</span>'
-                f'<span><span class="pk-dot pk-grey"></span>{MI("lt_p50")}</span>'
-                f'<span style="margin-left:auto">⋮ {MI("avg_mark")}</span>'
+                f'<span><span class="pk-dot pk-green"></span>{MIE("p75plus")}</span>'
+                f'<span><span class="pk-dot pk-amber"></span>{MIE("p50_75")}</span>'
+                f'<span><span class="pk-dot pk-grey"></span>{MIE("lt_p50")}</span>'
+                f'<span style="margin-left:auto">⋮ {MIE("avg_mark")}</span>'
                 '</div>',
                 unsafe_allow_html=True,
             )
@@ -935,17 +927,7 @@ with tab4:
                 )
             st.markdown(f'<div class="pk-bars">{"".join(rows_html)}</div>', unsafe_allow_html=True)
 
-            narr_en = L["narr_line"][0].format(
-                metric=MI(lkey), avg=spec.format(avg_val), unit=unit,
-                leader=leader_name, best=spec.format(best_val),
-                n=n_p75, n_rows=n_rows, thr=spec.format(p75_thr),
-            )
-            narr_zh = L["narr_line"][1].format(
-                metric=MI(lkey), avg=spec.format(avg_val), unit=unit,
-                leader=leader_name, best=spec.format(best_val),
-                n=n_p75, n_rows=n_rows, thr=spec.format(p75_thr),
-            )
-            st.caption(f"{narr_en}\n\n{narr_zh}")
+            st.caption(f"{leader_name} leads with {spec.format(best_val)} {unit}. {n_p75} of {n_rows} players above P75.")
 
         st.markdown("---")
 
@@ -993,6 +975,4 @@ with tab4:
             },
         )
 
-        note_en = L["table_note"][0].format(n=MIN_MINUTES)
-        note_zh = L["table_note"][1].format(n=MIN_MINUTES)
-        st.caption(f"{note_en}\n\n{note_zh}")
+        st.caption(L["table_note"][0].format(n=MIN_MINUTES))
